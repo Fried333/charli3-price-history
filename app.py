@@ -375,6 +375,48 @@ def compare_price(feed: str):
     return result
 
 
+from predictions import create_prediction, challenge_prediction, settle_predictions, list_predictions
+
+
+@app.post("/api/predict")
+def make_prediction(
+    creator: str = Query(..., description="Your name or wallet"),
+    direction: str = Query(..., description="'above' or 'below'"),
+    target_price: float = Query(..., description="Target price"),
+    deadline: str = Query(..., description="ISO timestamp for settlement"),
+    feed: str = Query("ADA-USD"),
+    stake: float = Query(0, description="ADA stake amount"),
+):
+    """Create a price prediction. Charli3 oracle settles it at the deadline."""
+    if direction not in ('above', 'below'):
+        return JSONResponse({"error": "Direction must be 'above' or 'below'"}, 400)
+    pred_id = create_prediction(creator, feed, direction, target_price, deadline, stake)
+    return {"id": pred_id, "status": "open", "message": f"Prediction created: ADA will be {direction} ${target_price} by {deadline}"}
+
+
+@app.post("/api/predict/{pred_id}/challenge")
+def take_challenge(pred_id: str, challenger: str = Query(...)):
+    """Take the other side of a prediction."""
+    return challenge_prediction(pred_id, challenger)
+
+
+@app.post("/api/predict/settle")
+def run_settlement():
+    """Settle all predictions past their deadline using Charli3 oracle."""
+    results = settle_predictions()
+    return {"settled": len(results), "results": results}
+
+
+@app.get("/api/predictions")
+def get_predictions(status: str = Query(None)):
+    """List all predictions."""
+    preds = list_predictions(status)
+    for p in preds:
+        if p['deadline_ms']:
+            p['deadline'] = datetime.fromtimestamp(p['deadline_ms'] / 1000, tz=timezone.utc).isoformat()
+    return {"predictions": preds, "count": len(preds)}
+
+
 @app.get("/")
 def index():
     return FileResponse(str(Path(__file__).parent / "index.html"))
