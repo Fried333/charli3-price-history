@@ -89,13 +89,26 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
     <div class="stats-grid" id="stats"></div>
   </section>
 
+  <section>
+    <h2>Oracle Accuracy</h2>
+    <div id="compare" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
+      <p style="color:var(--muted)">Loading comparison...</p>
+    </div>
+  </section>
+
   <section class="api-section">
     <h2>API Documentation</h2>
     <p>Latest price for a feed:</p>
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/price/ADA-USD</pre>
     <p>Historical prices (up to 1000):</p>
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/history/ADA-USD?limit=50</pre>
-    <p>List all feeds with latest prices:</p>
+    <p>Price at a specific time (for DeFi settlement):</p>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/price-at/ADA-USD?time=2026-04-17T12:00:00Z</pre>
+    <p>Compare oracle vs market price:</p>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/compare/ADA-USD</pre>
+    <p>Export full history as CSV:</p>
+    <pre onclick="copyCmd(this)">curl -O https://86-107-168-44.sslip.io/api/export/ADA-USD</pre>
+    <p>List all feeds:</p>
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/feeds</pre>
     <p>Overall statistics:</p>
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/stats</pre>
@@ -233,8 +246,35 @@ function copyCmd(el){navigator.clipboard.writeText(el.textContent.trim());
 
 /* --- Init --- */
 window.addEventListener('resize',()=>chartData.length&&drawChart());
-loadTicker();loadChart(activeFeed);loadStats();
-setInterval(loadTicker,30000);
+async function loadCompare(){
+  try{
+    const r=await fetch('/api/compare/ADA-USD');const d=await r.json();
+    const el=document.getElementById('compare');
+    if(!d.market){el.innerHTML='<p style="color:var(--muted)">Market price unavailable for comparison</p>';return;}
+    const dev=d.deviation_percent;
+    const color=dev<1?'var(--green)':dev<3?'var(--amber)':'var(--red)';
+    const verdict=dev<1?'Highly accurate':dev<3?'Minor deviation':'Significant deviation';
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;text-align:center">
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Charli3 Oracle</div>
+          <div style="font-size:1.5rem;font-weight:700">$${d.oracle.price.toFixed(6)}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">on-chain datum</div>
+        </div>
+        <div>
+          <div style="font-size:2rem;font-weight:700;color:${color}">${dev.toFixed(2)}%</div>
+          <div style="font-size:0.75rem;color:${color}">${verdict}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Market (CoinGecko)</div>
+          <div style="font-size:1.5rem;font-weight:700">$${d.market.price.toFixed(6)}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">live spot</div>
+        </div>
+      </div>`;
+  }catch(e){document.getElementById('compare').innerHTML='<p style="color:var(--muted)">Comparison unavailable</p>';}
+}
+loadTicker();loadChart(activeFeed);loadStats();loadCompare();
+setInterval(loadTicker,30000);setInterval(loadCompare,60000);
 </script>
 </body>
 </html>

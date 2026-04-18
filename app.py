@@ -176,6 +176,119 @@ def stats():
     return result
 
 
+@app.get("/api/price-at/{feed}")
+def price_at_time(feed: str, time: str = Query(..., description="ISO timestamp or unix ms")):
+    """Get the closest oracle price to a specific timestamp."""
+    feed_name = feed.upper().replace("-", "/")
+    if feed_name not in FEEDS:
+        return JSONResponse({"error": f"Unknown feed. Available: {FEEDS}"}, 404)
+
+    try:
+        if time.isdigit():
+            target_ms = int(time)
+        else:
+            target_ms = int(datetime.fromisoformat(time.replace('Z', '+00:00')).timestamp() * 1000)
+    except ValueError:
+        return JSONResponse({"error": "Invalid time format. Use ISO timestamp or unix ms."}, 400)
+
+    conn = get_db()
+    row = conn.execute(
+        """SELECT price, timestamp_ms, datum_hash, tx_id,
+                  ABS(timestamp_ms - ?) as distance
+           FROM prices WHERE feed=? ORDER BY distance ASC LIMIT 1""",
+        (target_ms, feed_name)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return JSONResponse({"error": "No price data available"}, 404)
+
+    return {
+        "feed": feed_name,
+        "price": row[0],
+        "timestamp": datetime.fromtimestamp(row[1] / 1000, tz=timezone.utc).isoformat(),
+        "requested_time": datetime.fromtimestamp(target_ms / 1000, tz=timezone.utc).isoformat(),
+        "distance_seconds": round(row[4] / 1000),
+        "datum_hash": row[2],
+        "tx_id": row[3],
+        "source": "charli3",
+    }
+
+
+@app.get("/api/export/{feed}")
+def export_csv(feed: str):
+    """Download all historical prices as CSV."""
+    feed_name = feed.upper().replace("-", "/")
+    if feed_name not in FEEDS:
+        return JSONResponse({"error": f"Unknown feed. Available: {FEEDS}"}, 404)
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT price, timestamp_ms, datum_hash, tx_id FROM prices WHERE feed=? ORDER BY timestamp_ms ASC",
+        (feed_name,)
+    ).fetchall()
+    conn.close()
+
+    lines = ["timestamp,price,datum_hash,tx_id"]
+    for r in rows:
+        ts = datetime.fromtimestamp(r[1] / 1000, tz=timezone.utc).isoformat()
+        lines.append(f"{ts},{r[0]},{r[2]},{r[3]}")
+
+    from fastapi.responses import Response
+    return Response(
+        content="\n".join(lines),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={feed_name.replace('/', '-')}_prices.csv"},
+    )
+
+
+@app.get("/api/compare/{feed}")
+def compare_price(feed: str):
+    """Compare Charli3 oracle price vs CoinGecko market price."""
+    feed_name = feed.upper().replace("-", "/")
+    if feed_name not in FEEDS:
+        return JSONResponse({"error": f"Unknown feed. Available: {FEEDS}"}, 404)
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT price, timestamp_ms FROM prices WHERE feed=? ORDER BY timestamp_ms DESC LIMIT 1",
+        (feed_name,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return JSONResponse({"error": "No oracle price available"}, 404)
+
+    oracle_price = row[0]
+    oracle_ts = row[1]
+
+    # Fetch market price from CoinGecko
+    market_price = None
+    try:
+        import requests as req
+        cg_ids = {"ADA/USD": "cardano", "BTC/USD": "bitcoin", "USDM/ADA": None}
+        cg_id = cg_ids.get(feed_name)
+        if cg_id:
+            r = req.get(f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd", timeout=10)
+            if r.status_code == 200:
+                market_price = r.json().get(cg_id, {}).get("usd")
+    except Exception:
+        pass
+
+    result = {
+        "feed": feed_name,
+        "oracle": {"price": oracle_price, "timestamp": datetime.fromtimestamp(oracle_ts / 1000, tz=timezone.utc).isoformat(), "source": "charli3"},
+        "market": {"price": market_price, "source": "coingecko"} if market_price else None,
+    }
+
+    if market_price and oracle_price:
+        deviation = abs(oracle_price - market_price) / market_price * 100
+        result["deviation_percent"] = round(deviation, 4)
+        result["oracle_accurate"] = deviation < 1.0
+
+    return result
+
+
 @app.get("/")
 def index():
     return FileResponse(str(Path(__file__).parent / "index.html"))
