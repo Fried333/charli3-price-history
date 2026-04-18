@@ -90,6 +90,41 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
   </section>
 
   <section>
+    <h2>Currency Converter</h2>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">Amount</label>
+          <input id="convAmt" type="number" value="1000" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;width:120px;font-size:1rem">
+        </div>
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">From</label>
+          <select id="convFrom" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:1rem">
+            <option value="ADA">ADA</option><option value="USD">USD</option><option value="BTC">BTC</option>
+          </select>
+        </div>
+        <span style="font-size:1.2rem;color:var(--muted);padding-bottom:8px">→</span>
+        <div>
+          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">To</label>
+          <select id="convTo" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:1rem">
+            <option value="USD">USD</option><option value="ADA">ADA</option><option value="BTC">BTC</option>
+          </select>
+        </div>
+        <button onclick="doConvert()" style="background:var(--primary);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:1rem">Convert</button>
+        <div id="convResult" style="font-size:1.3rem;font-weight:700;padding-bottom:4px"></div>
+      </div>
+      <div id="convMeta" style="font-size:0.75rem;color:var(--muted);margin-top:8px"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Oracle Health</h2>
+    <div id="health" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
+      <p style="color:var(--muted)">Loading health data...</p>
+    </div>
+  </section>
+
+  <section>
     <h2>Oracle Accuracy</h2>
     <div id="compare" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
       <p style="color:var(--muted)">Loading comparison...</p>
@@ -106,6 +141,10 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/price-at/ADA-USD?time=2026-04-17T12:00:00Z</pre>
     <p>Compare oracle vs market price:</p>
     <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/compare/ADA-USD</pre>
+    <p>Convert currencies using oracle price:</p>
+    <pre onclick="copyCmd(this)">curl "https://86-107-168-44.sslip.io/api/convert?amount=1000&from_currency=ADA&to_currency=USD"</pre>
+    <p>Oracle health and uptime metrics:</p>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/health/ADA-USD</pre>
     <p>Export full history as CSV:</p>
     <pre onclick="copyCmd(this)">curl -O https://86-107-168-44.sslip.io/api/export/ADA-USD</pre>
     <p>List all feeds:</p>
@@ -273,7 +312,45 @@ async function loadCompare(){
       </div>`;
   }catch(e){document.getElementById('compare').innerHTML='<p style="color:var(--muted)">Comparison unavailable</p>';}
 }
-loadTicker();loadChart(activeFeed);loadStats();loadCompare();
+async function doConvert(){
+  const amt=document.getElementById('convAmt').value;
+  const from=document.getElementById('convFrom').value;
+  const to=document.getElementById('convTo').value;
+  try{
+    const r=await fetch(`/api/convert?amount=${amt}&from_currency=${from}&to_currency=${to}`);
+    const d=await r.json();
+    if(d.error){document.getElementById('convResult').textContent=d.error;return;}
+    document.getElementById('convResult').textContent=`${d.to.amount.toLocaleString('en',{maximumFractionDigits:6})} ${d.to.currency}`;
+    document.getElementById('convMeta').textContent=`Rate: 1 ${from} = ${d.rate} ${to} · Source: Charli3 oracle · ${new Date(d.timestamp).toLocaleString()}`;
+  }catch(e){document.getElementById('convResult').textContent='Error';}
+}
+
+async function loadHealth(){
+  try{
+    const r=await fetch('/api/health/ADA-USD');const d=await r.json();
+    if(d.health==='insufficient_data'){document.getElementById('health').innerHTML='<p style="color:var(--muted)">Not enough data for health analysis</p>';return;}
+    const staleColor=d.is_stale?'var(--red)':'var(--green)';
+    const uptimeColor=d.uptime_percent>80?'var(--green)':d.uptime_percent>50?'var(--amber)':'var(--red)';
+    // Build hourly bar chart
+    const hours=Object.entries(d.hourly_updates||{});
+    const maxCount=Math.max(...hours.map(h=>h[1]),1);
+    const bars=hours.map(([h,c])=>`<div style="display:flex;align-items:end;gap:2px;flex-direction:column">
+      <div style="background:var(--primary);width:100%;height:${Math.max(4,c/maxCount*60)}px;border-radius:2px" title="${h}: ${c} updates"></div>
+      <span style="font-size:0.55rem;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg)">${h.slice(11,13)}h</span>
+    </div>`).join('');
+    document.getElementById('health').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;text-align:center">
+        <div><div style="font-size:1.5rem;font-weight:700;color:${uptimeColor}">${d.uptime_percent}%</div><div style="font-size:0.75rem;color:var(--muted)">Uptime</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700">${d.avg_update_interval_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Avg Interval</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700;color:${staleColor}">${d.current_staleness_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Current Staleness</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700">${d.max_gap_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Longest Gap</div></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">Updates per hour (${d.span_hours}h span)</div>
+      <div style="display:flex;gap:2px;align-items:end;height:80px;padding:4px 0">${bars}</div>`;
+  }catch(e){document.getElementById('health').innerHTML='<p style="color:var(--muted)">Health data unavailable</p>';}
+}
+
+loadTicker();loadChart(activeFeed);loadStats();loadCompare();loadHealth();
 setInterval(loadTicker,30000);setInterval(loadCompare,60000);
 </script>
 </body>

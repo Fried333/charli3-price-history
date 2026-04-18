@@ -242,6 +242,95 @@ def export_csv(feed: str):
     )
 
 
+@app.get("/api/convert")
+def convert(amount: float = Query(...), from_currency: str = Query("ADA"), to_currency: str = Query("USD")):
+    """Convert between currencies using Charli3 oracle prices."""
+    feed_map = {
+        ("ADA", "USD"): ("ADA/USD", False),
+        ("USD", "ADA"): ("ADA/USD", True),
+        ("BTC", "USD"): ("BTC/USD", False),
+        ("USD", "BTC"): ("BTC/USD", True),
+    }
+    key = (from_currency.upper(), to_currency.upper())
+    if key not in feed_map:
+        return JSONResponse({"error": f"Unsupported pair. Available: {list(feed_map.keys())}"}, 400)
+
+    feed_name, invert = feed_map[key]
+    conn = get_db()
+    row = conn.execute(
+        "SELECT price, timestamp_ms FROM prices WHERE feed=? ORDER BY timestamp_ms DESC LIMIT 1",
+        (feed_name,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return JSONResponse({"error": "No price data"}, 404)
+
+    rate = 1 / row[0] if invert else row[0]
+    result = amount * rate
+
+    return {
+        "from": {"amount": amount, "currency": from_currency.upper()},
+        "to": {"amount": round(result, 6), "currency": to_currency.upper()},
+        "rate": round(rate, 6),
+        "oracle_price": row[0],
+        "feed": feed_name,
+        "timestamp": datetime.fromtimestamp(row[1] / 1000, tz=timezone.utc).isoformat(),
+        "source": "charli3",
+    }
+
+
+@app.get("/api/health/{feed}")
+def feed_health(feed: str):
+    """Oracle health metrics — update frequency, gaps, reliability."""
+    feed_name = feed.upper().replace("-", "/")
+    if feed_name not in FEEDS:
+        return JSONResponse({"error": f"Unknown feed. Available: {FEEDS}"}, 404)
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT timestamp_ms FROM prices WHERE feed=? ORDER BY timestamp_ms ASC",
+        (feed_name,)
+    ).fetchall()
+    conn.close()
+
+    if len(rows) < 2:
+        return {"feed": feed_name, "total_updates": len(rows), "health": "insufficient_data"}
+
+    timestamps = [r[0] for r in rows]
+    gaps = [(timestamps[i+1] - timestamps[i]) / 1000 / 60 for i in range(len(timestamps)-1)]
+    now_ms = int(time.time() * 1000)
+    staleness = (now_ms - timestamps[-1]) / 1000 / 60
+
+    # Uptime: percentage of 10-min windows that had at least one update
+    span_minutes = (timestamps[-1] - timestamps[0]) / 1000 / 60
+    windows_total = max(1, int(span_minutes / 10))
+    windows_covered = set()
+    for ts in timestamps:
+        window = int((ts - timestamps[0]) / 1000 / 60 / 10)
+        windows_covered.add(window)
+    uptime = len(windows_covered) / windows_total * 100
+
+    # Hourly update counts for chart
+    hourly = {}
+    for ts in timestamps:
+        hour = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime('%Y-%m-%d %H:00')
+        hourly[hour] = hourly.get(hour, 0) + 1
+
+    return {
+        "feed": feed_name,
+        "total_updates": len(timestamps),
+        "current_staleness_minutes": round(staleness, 1),
+        "is_stale": staleness > 60,
+        "avg_update_interval_minutes": round(sum(gaps) / len(gaps), 1),
+        "min_gap_minutes": round(min(gaps), 1),
+        "max_gap_minutes": round(max(gaps), 1),
+        "uptime_percent": round(uptime, 1),
+        "span_hours": round(span_minutes / 60, 1),
+        "hourly_updates": hourly,
+    }
+
+
 @app.get("/api/compare/{feed}")
 def compare_price(feed: str):
     """Compare Charli3 oracle price vs CoinGecko market price."""
