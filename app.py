@@ -302,14 +302,11 @@ def feed_health(feed: str):
     now_ms = int(time.time() * 1000)
     staleness = (now_ms - timestamps[-1]) / 1000 / 60
 
-    # Uptime: percentage of 10-min windows that had at least one update
     span_minutes = (timestamps[-1] - timestamps[0]) / 1000 / 60
-    windows_total = max(1, int(span_minutes / 10))
-    windows_covered = set()
-    for ts in timestamps:
-        window = int((ts - timestamps[0]) / 1000 / 60 / 10)
-        windows_covered.add(window)
-    uptime = len(windows_covered) / windows_total * 100
+
+    # Updates in last 24h
+    day_ago = now_ms - 86400000
+    updates_24h = sum(1 for ts in timestamps if ts > day_ago)
 
     # Hourly update counts for chart
     hourly = {}
@@ -320,12 +317,12 @@ def feed_health(feed: str):
     return {
         "feed": feed_name,
         "total_updates": len(timestamps),
+        "updates_last_24h": updates_24h,
         "current_staleness_minutes": round(staleness, 1),
-        "is_stale": staleness > 60,
+        "is_stale": staleness > 120,
         "avg_update_interval_minutes": round(sum(gaps) / len(gaps), 1),
         "min_gap_minutes": round(min(gaps), 1),
         "max_gap_minutes": round(max(gaps), 1),
-        "uptime_percent": round(uptime, 1),
         "span_hours": round(span_minutes / 60, 1),
         "hourly_updates": hourly,
     }

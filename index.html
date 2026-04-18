@@ -330,7 +330,6 @@ async function loadHealth(){
     const r=await fetch('/api/health/ADA-USD');const d=await r.json();
     if(d.health==='insufficient_data'){document.getElementById('health').innerHTML='<p style="color:var(--muted)">Not enough data for health analysis</p>';return;}
     const staleColor=d.is_stale?'var(--red)':'var(--green)';
-    const uptimeColor=d.uptime_percent>80?'var(--green)':d.uptime_percent>50?'var(--amber)':'var(--red)';
     // Build hourly bar chart
     const hours=Object.entries(d.hourly_updates||{});
     const maxCount=Math.max(...hours.map(h=>h[1]),1);
@@ -340,10 +339,10 @@ async function loadHealth(){
     </div>`).join('');
     document.getElementById('health').innerHTML=`
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;text-align:center">
-        <div><div style="font-size:1.5rem;font-weight:700;color:${uptimeColor}">${d.uptime_percent}%</div><div style="font-size:0.75rem;color:var(--muted)">Uptime</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700">${d.total_updates}</div><div style="font-size:0.75rem;color:var(--muted)">Total Updates</div></div>
         <div><div style="font-size:1.5rem;font-weight:700">${d.avg_update_interval_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Avg Interval</div></div>
         <div><div style="font-size:1.5rem;font-weight:700;color:${staleColor}">${d.current_staleness_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Current Staleness</div></div>
-        <div><div style="font-size:1.5rem;font-weight:700">${d.max_gap_minutes}m</div><div style="font-size:0.75rem;color:var(--muted)">Longest Gap</div></div>
+        <div><div style="font-size:1.5rem;font-weight:700">${d.updates_last_24h||0}</div><div style="font-size:0.75rem;color:var(--muted)">Last 24h</div></div>
       </div>
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">Updates per hour (${d.span_hours}h span)</div>
       <div style="display:flex;gap:2px;align-items:end;height:80px;padding:4px 0">${bars}</div>`;
