@@ -211,6 +211,18 @@ def crawl_all():
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--watch", action="store_true", help="Continuous mode: crawl every 5 minutes")
+    args = ap.parse_args()
+
     print("Charli3 Price History Crawler")
     print("=" * 40)
     crawl_all()
+
+    if args.watch:
+        print("\nWatch mode — crawling every 5 minutes (Ctrl+C to stop)")
+        while True:
+            time.sleep(300)
+            print(f"\n[{datetime.now(timezone.utc).strftime('%H:%M UTC')}] Recrawling...")
+            crawl_all()
