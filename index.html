@@ -132,32 +132,60 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
   </section>
 
   <section>
-    <h2>Price Predictions</h2>
+    <h2>Embeddable Widgets</h2>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px">
-      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Make a prediction on ADA price. Charli3 oracle settles it automatically at the deadline.</p>
-      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:16px">
-        <div>
-          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">Your name</label>
-          <input id="predName" type="text" placeholder="alice" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;width:100px">
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:16px">Drop a live Charli3 price widget into any website. Just paste the snippet — zero dependencies, auto-refreshes every 30 seconds.</p>
+
+      <div style="margin-bottom:24px">
+        <h3 style="font-size:0.9rem;margin-bottom:8px">Simple Price Badge</h3>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:8px">
+          <div id="widget-demo-badge" style="display:inline-flex;align-items:center;gap:8px;background:#1a1d27;border:1px solid #2a2e3f;border-radius:8px;padding:8px 16px;font-family:system-ui;font-size:14px;color:#e1e4ec">
+            <span style="color:#7a7f95">ADA/USD</span>
+            <span style="font-weight:700" id="widget-badge-price">$0.2527</span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#34d399;display:inline-block"></span>
+          </div>
         </div>
-        <div>
-          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">ADA will be</label>
-          <select id="predDir" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px">
-            <option value="above">above</option><option value="below">below</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">$USD target</label>
-          <input id="predTarget" type="number" step="0.001" value="0.260" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;width:100px">
-        </div>
-        <div>
-          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px">By (UTC)</label>
-          <input id="predDeadline" type="datetime-local" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px">
-        </div>
-        <button onclick="submitPrediction()" style="background:var(--primary);color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer">Predict</button>
+        <pre onclick="copyCmd(this)" style="font-size:0.75rem">&lt;div id="c3-price"&gt;&lt;/div&gt;
+&lt;script&gt;
+fetch('https://86-107-168-44.sslip.io/api/price/ADA-USD')
+  .then(r=&gt;r.json())
+  .then(d=&gt;document.getElementById('c3-price').innerHTML=
+    '&lt;span style="font-weight:700"&gt;ADA $'+d.price.toFixed(4)+'&lt;/span&gt;'+
+    ' &lt;span style="color:#888;font-size:12px"&gt;via Charli3&lt;/span&gt;');
+&lt;/script&gt;</pre>
       </div>
-      <div id="predResult" style="font-size:0.85rem;margin-bottom:16px"></div>
-      <div id="predList"></div>
+
+      <div style="margin-bottom:24px">
+        <h3 style="font-size:0.9rem;margin-bottom:8px">Multi-Feed Ticker</h3>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:8px">
+          <div style="display:flex;gap:24px;font-family:system-ui;font-size:13px;color:#e1e4ec">
+            <span><span style="color:#7a7f95">ADA</span> <strong>$0.2527</strong></span>
+            <span><span style="color:#7a7f95">BTC</span> <strong>$74,888</strong></span>
+            <span><span style="color:#7a7f95">USDM</span> <strong>4.06 ADA</strong></span>
+          </div>
+        </div>
+        <pre onclick="copyCmd(this)" style="font-size:0.75rem">&lt;div id="c3-ticker"&gt;&lt;/div&gt;
+&lt;script&gt;
+fetch('https://86-107-168-44.sslip.io/api/feeds')
+  .then(r=&gt;r.json())
+  .then(d=&gt;document.getElementById('c3-ticker').innerHTML=
+    d.feeds.map(f=&gt;f.feed+' &lt;b&gt;$'+f.latest_price+'&lt;/b&gt;').join(' · '));
+&lt;/script&gt;</pre>
+      </div>
+
+      <div>
+        <h3 style="font-size:0.9rem;margin-bottom:8px">Converter Widget</h3>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:8px">
+          <div style="font-family:system-ui;font-size:14px;color:#e1e4ec">
+            <span style="font-weight:700">1,000 ADA</span> <span style="color:#7a7f95">=</span> <span style="font-weight:700;color:#34d399">$252.70 USD</span> <span style="color:#7a7f95;font-size:11px">via Charli3 oracle</span>
+          </div>
+        </div>
+        <pre onclick="copyCmd(this)" style="font-size:0.75rem">&lt;script&gt;
+fetch('https://86-107-168-44.sslip.io/api/convert?amount=1000&amp;from_currency=ADA&amp;to_currency=USD')
+  .then(r=&gt;r.json())
+  .then(d=&gt;document.write(d.from.amount+' ADA = $'+d.to.amount.toFixed(2)+' USD'));
+&lt;/script&gt;</pre>
+      </div>
     </div>
   </section>
 
@@ -379,47 +407,7 @@ async function loadHealth(){
   }catch(e){document.getElementById('health').innerHTML='<p style="color:var(--muted)">Health data unavailable</p>';}
 }
 
-async function submitPrediction(){
-  const name=document.getElementById('predName').value;
-  const dir=document.getElementById('predDir').value;
-  const target=document.getElementById('predTarget').value;
-  const dl=document.getElementById('predDeadline').value;
-  if(!name||!target||!dl){document.getElementById('predResult').innerHTML='<span style="color:var(--red)">Fill all fields</span>';return;}
-  try{
-    const r=await fetch(`/api/predict?creator=${encodeURIComponent(name)}&direction=${dir}&target_price=${target}&deadline=${dl}:00Z&feed=ADA-USD`,{method:'POST'});
-    const d=await r.json();
-    document.getElementById('predResult').innerHTML=d.error?`<span style="color:var(--red)">${d.error}</span>`:`<span style="color:var(--green)">Created! ID: ${d.id} — ${d.message}</span>`;
-    loadPredictions();
-  }catch(e){document.getElementById('predResult').innerHTML='<span style="color:var(--red)">Error</span>';}
-}
-async function loadPredictions(){
-  try{
-    // Try settling first
-    await fetch('/api/predict/settle',{method:'POST'});
-    const r=await fetch('/api/predictions');const d=await r.json();
-    if(!d.predictions.length){document.getElementById('predList').innerHTML='<p style="color:var(--muted);font-size:0.85rem">No predictions yet. Be the first!</p>';return;}
-    document.getElementById('predList').innerHTML=d.predictions.map(p=>{
-      const dl=p.deadline?new Date(p.deadline).toLocaleString():'?';
-      const statusColor=p.status==='settled'?(p.winner===p.creator?'var(--green)':'var(--red)'):p.status==='active'?'var(--amber)':'var(--muted)';
-      let statusText=p.status;
-      if(p.status==='settled') statusText=`settled @ $${p.settlement_price} — ${p.winner} wins`;
-      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
-        <div><strong>${p.creator}</strong> predicts ADA ${p.direction} <strong>$${p.target_price}</strong> by ${dl}</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="color:${statusColor}">${statusText}</span>
-          ${p.status==='open'?`<button onclick="challengePred('${p.id}')" style="background:var(--amber);color:var(--bg);border:none;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem">Challenge</button>`:''}
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){}
-}
-async function challengePred(id){
-  const name=prompt('Your name:');
-  if(!name)return;
-  await fetch(`/api/predict/${id}/challenge?challenger=${encodeURIComponent(name)}`,{method:'POST'});
-  loadPredictions();
-}
-loadTicker();loadChart(activeFeed);loadStats();loadCompare();loadHealth();loadPredictions();
+loadTicker();loadChart(activeFeed);loadStats();loadCompare();loadHealth();
 setInterval(loadTicker,30000);setInterval(loadCompare,60000);
 </script>
 </body>
