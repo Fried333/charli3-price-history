@@ -59,6 +59,23 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
   <div class="ticker-bar" id="ticker"></div>
 
   <section>
+    <h2>What is this?</h2>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px;line-height:1.8">
+      <p style="margin-bottom:12px">Charli3 operates a <strong>pull oracle</strong> on Cardano — prices are published on-chain only when someone requests an update. This means there's no continuous price feed and no historical price API.</p>
+      <p style="margin-bottom:12px">This tool solves that. It <strong>crawls the blockchain</strong>, finds every price datum Charli3 has ever published, decodes the Plutus CBOR data, and serves it via a simple REST API.</p>
+      <p style="margin-bottom:12px"><strong>How it works:</strong></p>
+      <ol style="margin-left:20px;color:var(--muted)">
+        <li>Scans the Charli3 oracle smart contract address on Cardano</li>
+        <li>Finds all UTxOs carrying C3AS (Asset State) tokens with inline datums</li>
+        <li>Decodes CBOR: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:0.85em">Tag(121, [Tag(123, [{0: price, 1: valid_from, 2: valid_to}])])</code></li>
+        <li>Indexes prices in a database with timestamps</li>
+        <li>Serves via REST — one HTTP call instead of chain queries + CBOR parsing</li>
+      </ol>
+      <p style="margin-top:12px"><strong>Without Charli3's oracle, this tool has no data.</strong> Every price shown here was published by Charli3's oracle nodes after aggregating from multiple sources and cryptographically signing the result.</p>
+    </div>
+  </section>
+
+  <section>
     <h2>Price Chart</h2>
     <div class="chart-wrap">
       <div class="chart-btns" id="chartBtns"></div>
@@ -75,20 +92,20 @@ footer{text-align:center;padding:32px 0;color:var(--muted);font-size:0.8rem;bord
   <section class="api-section">
     <h2>API Documentation</h2>
     <p>Latest price for a feed:</p>
-    <pre onclick="copyCmd(this)">curl /api/price/ADA-USD</pre>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/price/ADA-USD</pre>
     <p>Historical prices (up to 1000):</p>
-    <pre onclick="copyCmd(this)">curl /api/history/ADA-USD?limit=50</pre>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/history/ADA-USD?limit=50</pre>
     <p>List all feeds with latest prices:</p>
-    <pre onclick="copyCmd(this)">curl /api/feeds</pre>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/feeds</pre>
     <p>Overall statistics:</p>
-    <pre onclick="copyCmd(this)">curl /api/stats</pre>
+    <pre onclick="copyCmd(this)">curl https://86-107-168-44.sslip.io/api/stats</pre>
   </section>
 
   <section>
     <h2>Embeddable Ticker Widget</h2>
     <div class="embed-box">
       <p style="font-size:0.85rem;color:var(--muted)">Embed a live price ticker on any website:</p>
-      <code>&lt;iframe src="https://your-domain/ticker" width="300" height="60" frameborder="0"&gt;&lt;/iframe&gt;</code>
+      <code>&lt;iframe src="https://86-107-168-44.sslip.io" width="400" height="200" frameborder="0" style="border-radius:12px"&gt;&lt;/iframe&gt;</code>
     </div>
   </section>
 
